@@ -1,56 +1,42 @@
-# Welcome to your Expo app 👋
+# Autogenic
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A guided autogenic training app built with Expo (SDK 58) and Expo Router.
 
-## Get started
+Autogenic training is a relaxation method: you repeat short phrases silently ("My arms and legs are heavy") and let your body follow them. It's learned one exercise at a time, about a week each, and every session runs through all the exercises learned so far.
 
-1. Install dependencies
+## What's in the app
 
-   ```bash
-   npm install
-   ```
+- **Practice**: today's session for your current stage, your streak, and the exact sequence you'll go through.
+- **Session** (full screen): a calm check-in, the guided phrases with a slow breathing guide (4 s in, 6 s out), optional voice guidance, pause, a closing "come back" sequence, then a second check-in and a summary.
+- **Exercises**: the six standard exercises (heaviness, warmth, heartbeat, breathing, abdominal warmth, cool forehead) with what to notice, how to practice, and cautions. Move to any stage from here.
+- **Progress**: sessions, minutes, streak, average calm change, a 7-day chart and recent sessions.
+- **Settings** (sheet): voice guidance, gentle taps, stage, repetitions, pace, reset.
 
-2. Start the app
+Everything is stored on the device. There's no account and no network use.
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Scan the QR code with Expo Go. Everything used is included in Expo Go, so no custom build is needed.
 
-### Other setup steps
+## Structure
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```
+src/app/                 routes (Expo Router)
+  (tabs)/(practice)/     Practice tab
+  (tabs)/(exercises)/    Exercises tab and exercise detail
+  (tabs)/(progress)/     Progress tab
+  session.tsx            guided session (full-screen modal)
+  settings.tsx           settings (form sheet)
+src/components/          shared UI (buttons, cards, breathing orb, tab bars)
+src/constants/theme.ts   design tokens: one sage accent, warm greys, light + dark
+src/data/exercises.ts    exercise content
+src/lib/                 session plan, stats, haptics
+src/store/app-store.ts   on-device state (AsyncStorage)
+```
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Autogenic training isn't a substitute for medical care. The app tells users to check with a clinician first if they have a heart condition, epilepsy or a serious mental health condition, and never to practice while driving.

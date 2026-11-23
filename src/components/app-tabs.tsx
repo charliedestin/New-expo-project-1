@@ -1,31 +1,29 @@
 import { NativeTabs } from 'expo-router/native-tabs';
-import { useColorScheme } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const theme = useTheme();
 
   return (
     <NativeTabs
-      backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
-        />
+      tintColor={theme.accent}
+      backgroundColor={theme.background}
+      indicatorColor={theme.accentSoft}
+      labelStyle={{ selected: { color: theme.accent } }}>
+      <NativeTabs.Trigger name="(practice)">
+        <NativeTabs.Trigger.Label>Practice</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'leaf', selected: 'leaf.fill' }} md="spa" />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="explore">
-        <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
+      <NativeTabs.Trigger name="(exercises)">
+        <NativeTabs.Trigger.Label>Exercises</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="list.number" md="format_list_numbered" />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="(progress)">
+        <NativeTabs.Trigger.Label>Progress</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="chart.bar" md="bar_chart" />
       </NativeTabs.Trigger>
     </NativeTabs>
   );
