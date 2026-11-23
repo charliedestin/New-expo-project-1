@@ -3,10 +3,10 @@ import { View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
-import { Card } from '@/components/card';
+import { Group } from '@/components/group';
 import { Icon } from '@/components/icon';
 import { ScreenScroll } from '@/components/screen-scroll';
-import { Radius, Spacing } from '@/constants/theme';
+import { ScreenInset, Spacing } from '@/constants/theme';
 import { exerciseById } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
 import { haptic } from '@/lib/haptics';
@@ -22,10 +22,14 @@ export default function ExerciseDetailScreen() {
     return (
       <ScreenScroll>
         <Stack.Screen options={{ title: 'Not found' }} />
-        <AppText variant="headline">This exercise doesn’t exist.</AppText>
-        <AppText variant="callout" tone="secondary">
-          Go back to the list and choose one of the six exercises.
-        </AppText>
+        <View style={{ gap: Spacing.sm, paddingTop: Spacing.xxl }}>
+          <AppText variant="headline" center>
+            This exercise doesn’t exist
+          </AppText>
+          <AppText variant="subhead" tone="secondary" center>
+            Go back and choose one of the six exercises.
+          </AppText>
+        </View>
       </ScreenScroll>
     );
   }
@@ -37,68 +41,33 @@ export default function ExerciseDetailScreen() {
     <ScreenScroll>
       <Stack.Screen options={{ title: exercise.title }} />
 
-      <View style={{ alignItems: 'center', gap: Spacing.four, paddingTop: Spacing.four }}>
-        <View
-          style={{
-            width: 88,
-            height: 88,
-            borderRadius: 44,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: theme.accentSoft,
-          }}>
-          <Icon name={exercise.icon} size={40} color={theme.accent} />
+      <View style={{ gap: Spacing.md, paddingHorizontal: Spacing.xs, paddingTop: Spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <Icon name={exercise.icon} size={17} color={theme.accent} />
+          <AppText variant="subhead" tone="secondary">
+            Stage {exercise.stage}
+            {isCurrent ? ' · Current' : isLearned ? ' · Learned' : ''}
+          </AppText>
         </View>
-        <AppText variant="caption" tone="accent">
-          Stage {exercise.stage}
-        </AppText>
-        <AppText variant="display" center selectable style={{ paddingHorizontal: Spacing.four }}>
-          “{exercise.formula}”
+        <AppText variant="phrase" selectable>
+          {exercise.formula}
         </AppText>
       </View>
 
-      <Card style={{ gap: Spacing.five }}>
-        <Section title="What you may notice" body={exercise.notice} />
-        <View style={{ height: 1, backgroundColor: theme.separator }} />
-        <Section title="How to practice" body={exercise.howTo} />
-      </Card>
+      <Group title="What you may notice">
+        <AppText variant="body" style={{ padding: ScreenInset }}>
+          {exercise.notice}
+        </AppText>
+      </Group>
 
-      {exercise.caution && (
-        <Card tone="muted" style={{ flexDirection: 'row', gap: Spacing.three }}>
-          <Icon
-            name={{ ios: 'info.circle', android: 'info', web: 'info' }}
-            size={20}
-            color={theme.textSecondary}
-          />
-          <AppText variant="callout" tone="secondary" style={{ flex: 1 }}>
-            {exercise.caution}
-          </AppText>
-        </Card>
-      )}
+      <Group title="How to practice" footer={exercise.caution}>
+        <AppText variant="body" style={{ padding: ScreenInset }}>
+          {exercise.howTo}
+        </AppText>
+      </Group>
 
-      {isCurrent ? (
-        <View
-          style={{
-            minHeight: 54,
-            borderRadius: Radius.pill,
-            borderWidth: 1,
-            borderColor: theme.separator,
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'row',
-            gap: Spacing.two,
-          }}>
-          <Icon
-            name={{ ios: 'checkmark', android: 'check', web: 'check' }}
-            size={18}
-            color={theme.textSecondary}
-          />
-          <AppText variant="headline" tone="secondary">
-            Your current stage
-          </AppText>
-        </View>
-      ) : (
-        <View style={{ gap: Spacing.two }}>
+      {!isCurrent ? (
+        <View style={{ gap: Spacing.sm }}>
           <Button
             label={
               isLearned ? `Go back to stage ${exercise.stage}` : `Move to stage ${exercise.stage}`
@@ -109,24 +78,13 @@ export default function ExerciseDetailScreen() {
               actions.setStage(exercise.stage);
             }}
           />
-          <AppText variant="footnote" tone="tertiary" center>
+          <AppText variant="footnote" tone="secondary" center>
             {isLearned
-              ? 'Sessions will include only the exercises up to this one.'
-              : 'Sessions will include every exercise up to this one.'}
+              ? 'Sessions will stop after this exercise.'
+              : 'Sessions will include every exercise up to this one. Most people wait until the current one comes easily.'}
           </AppText>
         </View>
-      )}
+      ) : null}
     </ScreenScroll>
-  );
-}
-
-function Section({ title, body }: { title: string; body: string }) {
-  return (
-    <View style={{ gap: Spacing.two }}>
-      <AppText variant="headline">{title}</AppText>
-      <AppText variant="body" tone="secondary">
-        {body}
-      </AppText>
-    </View>
   );
 }

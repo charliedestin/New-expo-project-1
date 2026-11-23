@@ -3,32 +3,34 @@ import { Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
-import { Card } from '@/components/card';
+import { DayPips } from '@/components/day-pips';
+import { Group, ICON_ROW_INSET, Row } from '@/components/group';
 import { Icon } from '@/components/icon';
-import { ScreenScroll, SectionHeader } from '@/components/screen-scroll';
-import { StepRow } from '@/components/step-row';
-import { Radius, Spacing } from '@/constants/theme';
-import { EXERCISES, MAX_STAGE } from '@/data/exercises';
+import { ScreenScroll } from '@/components/screen-scroll';
+import { ScreenInset, Spacing } from '@/constants/theme';
+import { EXERCISES } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
 import { haptic } from '@/lib/haptics';
-import { buildSessionPlan, formatMinutes, planDurationSec } from '@/lib/session-plan';
-import { currentStreak, lastSevenDays, sessionsToday } from '@/lib/stats';
-import { actions, useAppState } from '@/store/app-store';
+import { buildSessionPlan, formatMinutes, planDurationSec, RETURN_ICON } from '@/lib/session-plan';
+import { DAILY_TARGET, sessionsOn, stageReadiness } from '@/lib/stats';
+import { actions, useAppState, type VoiceMode } from '@/store/app-store';
 
 export default function PracticeScreen() {
   const theme = useTheme();
   const router = useRouter();
   const stage = useAppState((s) => s.stage);
+  const stageSince = useAppState((s) => s.stageSince);
+  const snoozedStage = useAppState((s) => s.snoozedStage);
   const settings = useAppState((s) => s.settings);
   const sessions = useAppState((s) => s.sessions);
   const seenIntro = useAppState((s) => s.seenIntro);
 
   const plan = buildSessionPlan(stage, settings);
   const exercise = EXERCISES[stage - 1];
-  const streak = currentStreak(sessions);
-  const today = sessionsToday(sessions);
-  const weekMinutes = lastSevenDays(sessions).reduce((sum, d) => sum + d.minutes, 0);
-  const exerciseSteps = plan.filter((s) => s.kind === 'exercise');
+  const next = EXERCISES[stage];
+  const today = sessionsOn(sessions, new Date()).length;
+  const readiness = stageReadiness(sessions, stage, stageSince);
+  const suggestNext = readiness.ready && snoozedStage !== stage && next;
 
   return (
     <>
@@ -39,11 +41,11 @@ export default function PracticeScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Settings"
-                hitSlop={10}
-                style={{ padding: Spacing.one }}>
+                hitSlop={12}
+                style={{ paddingHorizontal: Spacing.xs }}>
                 <Icon
                   name={{ ios: 'gearshape', android: 'settings', web: 'settings' }}
-                  size={22}
+                  size={21}
                   color={theme.accent}
                 />
               </Pressable>
@@ -52,125 +54,134 @@ export default function PracticeScreen() {
         }}
       />
       <ScreenScroll>
-        {!seenIntro && (
-          <Card tone="accent" style={{ gap: Spacing.three }}>
-            <AppText variant="headline">New to autogenic training?</AppText>
-            <AppText variant="callout" tone="secondary">
-              You’ll repeat short phrases silently and let your body follow them. Sit or lie
-              somewhere quiet, 2–3 times a day. Add one exercise at a time, about a week each.
+        <View style={{ gap: Spacing.lg, paddingHorizontal: Spacing.xs, paddingTop: Spacing.sm }}>
+          <View style={{ gap: Spacing.sm }}>
+            <AppText variant="subhead" tone="secondary">
+              Stage {stage} · {exercise.title}
             </AppText>
-            <AppText variant="footnote" tone="secondary">
-              Never practice while driving. If you have a heart condition, epilepsy, or a serious
-              mental health condition, check with a clinician first.
+            <AppText variant="phrase" selectable>
+              {exercise.formula}
             </AppText>
-            <Button
-              label="Got it"
-              variant="secondary"
-              size="medium"
-              style={{ alignSelf: 'flex-start', marginTop: Spacing.one }}
-              onPress={() => {
-                haptic.light();
-                actions.dismissIntro();
-              }}
-            />
-          </Card>
-        )}
-
-        <Card style={{ gap: Spacing.five, padding: Spacing.six }}>
-          <View style={{ gap: Spacing.two }}>
-            <AppText variant="caption" tone="accent">
-              Stage {stage} of {MAX_STAGE}
+            <AppText variant="subhead" tone="secondary">
+              {formatMinutes(planDurationSec(plan))}
+              {` · ${stage} ${stage === 1 ? 'exercise' : 'exercises'}`}
             </AppText>
-            <AppText variant="display">{exercise.title}</AppText>
-            <AppText variant="callout" tone="secondary">
-              {formatMinutes(planDurationSec(plan))} ·{' '}
-              {exerciseSteps.length === 1 ? '1 exercise' : `${exerciseSteps.length} exercises`}
-              {today > 0 ? ` · ${today === 1 ? 'Done once today' : `Done ${today}× today`}` : ''}
-            </AppText>
-          </View>
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-            {exerciseSteps.map((step) => (
-              <View
-                key={step.key}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  paddingVertical: 6,
-                  paddingLeft: 10,
-                  paddingRight: 12,
-                  borderRadius: Radius.pill,
-                  backgroundColor: theme.surfaceMuted,
-                }}>
-                <Icon name={step.icon} size={15} color={theme.textSecondary} />
-                <AppText variant="footnote" tone="secondary" style={{ fontWeight: '500' }}>
-                  {step.title}
-                </AppText>
-              </View>
-            ))}
           </View>
 
           <Button
-            label="Begin session"
-            icon={{ ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' }}
+            label="Start session"
             onPress={() => {
               haptic.light();
               router.push('/session');
             }}
           />
-        </Card>
 
-        <View style={{ flexDirection: 'row', gap: Spacing.three }}>
-          <StatTile value={String(streak)} unit={streak === 1 ? 'day' : 'days'} label="Streak" />
-          <StatTile value={String(weekMinutes)} unit="min" label="Last 7 days" />
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: Spacing.sm,
+              alignSelf: 'center',
+            }}
+            accessible
+            accessibilityLabel={`${today} of ${DAILY_TARGET} sessions today`}>
+            <DayPips count={today} filled={theme.accent} empty={theme.textTertiary} size={7} />
+            <AppText variant="footnote" tone="secondary" numeric>
+              {today === 0
+                ? 'No sessions yet today'
+                : today >= DAILY_TARGET
+                  ? `${today} sessions today`
+                  : `${today} of ${DAILY_TARGET} today`}
+            </AppText>
+          </View>
         </View>
 
-        <SectionHeader>
-          <AppText variant="caption" tone="tertiary">
-            Today’s sequence
-          </AppText>
-        </SectionHeader>
-        <Card padded={false}>
+        {suggestNext ? (
+          <Group title="Ready for the next exercise">
+            <View style={{ padding: ScreenInset, gap: Spacing.md }}>
+              <AppText variant="subhead" tone="secondary">
+                {exercise.title} has come clearly in {readiness.clearly} of your last{' '}
+                {readiness.recent.length} sessions. Add {next.title.toLowerCase()} to your sessions?
+              </AppText>
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                <Button
+                  label={`Add ${next.title.toLowerCase()}`}
+                  size="medium"
+                  onPress={() => {
+                    haptic.success();
+                    actions.setStage(stage + 1);
+                  }}
+                />
+                <Button
+                  label="Not yet"
+                  variant="plain"
+                  size="medium"
+                  onPress={() => actions.snoozeAdvance()}
+                />
+              </View>
+            </View>
+          </Group>
+        ) : null}
+
+        {!seenIntro ? (
+          <Group title="How it works">
+            <View style={{ padding: ScreenInset, gap: Spacing.md }}>
+              <AppText variant="subhead">
+                Sit or lie down somewhere quiet. Close your eyes and repeat each phrase silently,
+                without trying to make anything happen. The bell tells you when to move on.
+              </AppText>
+              <AppText variant="footnote" tone="secondary">
+                Practice two or three times a day and add one exercise about every week. Don’t
+                practice while driving. If you have a heart condition, epilepsy or a serious mental
+                health condition, check with a clinician first.
+              </AppText>
+              <Button
+                label="Got it"
+                variant="secondary"
+                size="medium"
+                style={{ alignSelf: 'flex-start' }}
+                onPress={() => actions.dismissIntro()}
+              />
+            </View>
+          </Group>
+        ) : null}
+
+        <Group title="This session" footer={sessionHint(settings.voice, settings.bell)}>
           {plan
             .filter((s) => s.kind !== 'return')
-            .map((step, i) => (
-              <StepRow
+            .map((step) => (
+              <Row
                 key={step.key}
                 icon={step.icon}
+                iconMuted={step.kind === 'calm'}
                 title={step.phrase}
-                detail={`${step.title} · ${step.repetitions}×`}
-                muted={step.kind === 'calm'}
-                divider={i > 0}
+                separatorInset={ICON_ROW_INSET}
+                trailing={
+                  <AppText variant="subhead" tone="tertiary" numeric>
+                    {step.repetitions}×
+                  </AppText>
+                }
               />
             ))}
-          <StepRow
-            icon={{ ios: 'sunrise', android: 'partly_cloudy_day', web: 'partly_cloudy_day' }}
+          <Row
+            icon={RETURN_ICON}
+            iconMuted
             title="Come back"
             detail="Arms firm, breathe deeply, eyes open"
-            muted
-            divider
+            separatorInset={ICON_ROW_INSET}
           />
-        </Card>
+        </Group>
       </ScreenScroll>
     </>
   );
 }
 
-function StatTile({ value, unit, label }: { value: string; unit: string; label: string }) {
-  return (
-    <Card style={{ flex: 1, gap: Spacing.one, padding: Spacing.five }}>
-      <AppText variant="footnote" tone="secondary">
-        {label}
-      </AppText>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-        <AppText variant="stat" numeric selectable>
-          {value}
-        </AppText>
-        <AppText variant="callout" tone="secondary">
-          {unit}
-        </AppText>
-      </View>
-    </Card>
-  );
+/** How the session will guide you, in the words of the current settings. */
+function sessionHint(voice: VoiceMode, bell: boolean) {
+  const cue = bell ? 'until the bell' : 'until the next phrase';
+  if (voice === 'every')
+    return `Each phrase is spoken at every repetition. Repeat it along silently ${cue}.`;
+  if (voice === 'once')
+    return `Each phrase is spoken once. Then repeat it to yourself silently ${cue}.`;
+  return `Read each phrase, close your eyes and repeat it to yourself silently ${cue}.`;
 }

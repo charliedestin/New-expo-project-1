@@ -72,8 +72,8 @@ function TabBar({ bottomInset, children, ...props }: TabListProps & { bottomInse
         borderTopWidth: 1,
         borderTopColor: theme.separator,
         backgroundColor: theme.background,
-        paddingBottom: Math.max(bottomInset, Spacing.two),
-        paddingTop: Spacing.two,
+        paddingBottom: Math.max(bottomInset, Spacing.sm),
+        paddingTop: Spacing.sm,
         alignItems: 'center',
       }}>
       <View style={{ flexDirection: 'row', width: '100%', maxWidth: MaxContentWidth }}>
@@ -97,10 +97,10 @@ function TabButton({
       {...(props as PressableProps)}
       accessibilityRole="tab"
       accessibilityState={{ selected: isFocused }}
-      style={{ flex: 1, alignItems: 'center', gap: 2, paddingVertical: Spacing.one }}>
+      style={{ flex: 1, alignItems: 'center', gap: 2, paddingVertical: Spacing.xs }}>
       <View
         style={{
-          paddingHorizontal: Spacing.four,
+          paddingHorizontal: Spacing.lg,
           paddingVertical: 4,
           borderRadius: 999,
           backgroundColor: isFocused ? theme.accentSoft : 'transparent',

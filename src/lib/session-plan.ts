@@ -12,7 +12,7 @@ export type SessionStep = {
   title: string;
   phrase: string;
   repetitions: number;
-  /** Seconds per repetition: say the phrase, then rest in the feeling. */
+  /** Seconds per repetition: the phrase, then resting in the feeling. */
   secondsPerRep: number;
   icon: IconName;
   kind: 'calm' | 'exercise' | 'return';
@@ -20,7 +20,22 @@ export type SessionStep = {
 
 const SECONDS_PER_REP: Record<Pace, number> = { steady: 12, slow: 16 };
 
-export function buildSessionPlan(stage: number, settings: Pick<Settings, 'repetitions' | 'pace'>) {
+export const RETURN_ICON: IconName = {
+  ios: 'sunrise',
+  android: 'partly_cloudy_day',
+  web: 'partly_cloudy_day',
+};
+
+/**
+ * The classic session: settle into calm, run every exercise learned so far, return to calm,
+ * then come back (arms firm, breathe, eyes open). Before sleep the coming-back is left out, so
+ * you can drift off.
+ */
+export function buildSessionPlan(
+  stage: number,
+  settings: Pick<Settings, 'repetitions' | 'pace'>,
+  options: { bedtime?: boolean } = {},
+) {
   const secondsPerRep = SECONDS_PER_REP[settings.pace];
   const calm = (key: string): SessionStep => ({
     key,
@@ -45,17 +60,19 @@ export function buildSessionPlan(stage: number, settings: Pick<Settings, 'repeti
     });
   }
   steps.push(calm('calm-close'));
-  RETURN_STEPS.forEach((phrase, i) =>
-    steps.push({
-      key: `return-${i}`,
-      title: 'Coming back',
-      phrase,
-      repetitions: 1,
-      secondsPerRep: 5,
-      icon: { ios: 'sunrise', android: 'partly_cloudy_day', web: 'partly_cloudy_day' },
-      kind: 'return',
-    }),
-  );
+  if (!options.bedtime) {
+    RETURN_STEPS.forEach((phrase, i) =>
+      steps.push({
+        key: `return-${i}`,
+        title: 'Coming back',
+        phrase,
+        repetitions: 1,
+        secondsPerRep: 6,
+        icon: RETURN_ICON,
+        kind: 'return',
+      }),
+    );
+  }
   return steps;
 }
 
@@ -64,6 +81,5 @@ export function planDurationSec(steps: SessionStep[]) {
 }
 
 export function formatMinutes(seconds: number) {
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  return `${minutes} min`;
+  return `${Math.max(1, Math.round(seconds / 60))} min`;
 }

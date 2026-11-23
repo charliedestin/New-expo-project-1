@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
-import { Colors } from '@/constants/theme';
+import { plainPaletteFor } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { hydrate, useAppState } from '@/store/app-store';
 
@@ -12,7 +12,7 @@ hydrate();
 export default function RootLayout() {
   const scheme = useColorScheme();
   const hydrated = useAppState((s) => s.hydrated);
-  const palette = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const palette = plainPaletteFor(scheme === 'dark' ? 'dark' : 'light');
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
 
   // Hold the splash until saved progress is loaded, so nothing flashes.

@@ -6,10 +6,10 @@ export default function AppTabs() {
   const theme = useTheme();
 
   return (
+    // iOS keeps the system tab bar material; only the selection takes the accent.
     <NativeTabs
       tintColor={theme.accent}
-      backgroundColor={theme.background}
-      indicatorColor={theme.accentSoft}
+      indicatorColor={process.env.EXPO_OS === 'android' ? theme.accentSoft : undefined}
       labelStyle={{ selected: { color: theme.accent } }}>
       <NativeTabs.Trigger name="(practice)">
         <NativeTabs.Trigger.Label>Practice</NativeTabs.Trigger.Label>

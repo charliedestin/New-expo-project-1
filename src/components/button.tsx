@@ -1,65 +1,70 @@
+import { useState } from 'react';
 import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { cubicBezier, useReducedMotion } from 'react-native-reanimated';
 
 import { AppText } from '@/components/app-text';
 import { Icon } from '@/components/icon';
-import { Radius, Spacing } from '@/constants/theme';
+import { Motion, Radius, Spacing } from '@/constants/theme';
 import type { IconName } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
 
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+const EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
 
-type PressableScaleProps = Omit<PressableProps, 'style'> & {
+type PressableScaleProps = Omit<PressableProps, 'style' | 'children'> & {
   style?: StyleProp<ViewStyle>;
-  /** Scale on press-in. Rows should pass 1 and rely on a highlight instead. */
-  pressedScale?: number;
+  children?: React.ReactNode;
 };
 
-/** Press feedback that lands on press-in, 120 ms, strong ease-out. */
+/**
+ * Button-like press feedback: scale 0.97 on press-in, as a Reanimated CSS transition (a state
+ * change, not a gesture, so no shared values). Reduce Motion swaps the scale for a dim.
+ */
 export function PressableScale({
   style,
-  pressedScale = 0.97,
   onPressIn,
   onPressOut,
   children,
   ...rest
 }: PressableScaleProps) {
+  const [pressed, setPressed] = useState(false);
   const reduceMotion = useReducedMotion();
-  const pressed = useSharedValue(0);
-  const animatedStyle = useAnimatedStyle(() => {
-    const p = pressed.get();
-    return reduceMotion
-      ? { opacity: 1 - p * 0.25 }
-      : { transform: [{ scale: 1 - p * (1 - pressedScale) }] };
-  });
 
   return (
     <Pressable
       {...rest}
+      pressRetentionOffset={16}
       onPressIn={(e) => {
-        pressed.set(withTiming(1, { duration: 100, easing: EASE_OUT }));
+        setPressed(true);
         onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        pressed.set(withTiming(0, { duration: 160, easing: EASE_OUT }));
+        setPressed(false);
         onPressOut?.(e);
       }}>
-      <Animated.View style={[style, animatedStyle]}>{children as React.ReactNode}</Animated.View>
+      <Animated.View
+        style={[
+          style,
+          {
+            transform: [{ scale: pressed && !reduceMotion ? 0.97 : 1 }],
+            opacity: pressed && reduceMotion ? 0.7 : 1,
+            transitionProperty: ['transform', 'opacity'],
+            transitionDuration: pressed ? Motion.press - 20 : Motion.press + 40,
+            transitionTimingFunction: EASE_OUT,
+          },
+        ]}>
+        {children}
+      </Animated.View>
     </Pressable>
   );
 }
 
 type ButtonProps = Omit<PressableScaleProps, 'children'> & {
   label: string;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'plain';
   icon?: IconName;
   size?: 'large' | 'medium';
+  /** For surfaces with their own palette (the session screen). */
+  colors?: { background: string; foreground: string };
 };
 
 export function Button({
@@ -69,34 +74,38 @@ export function Button({
   size = 'large',
   style,
   disabled,
+  colors,
   ...rest
 }: ButtonProps) {
   const theme = useTheme();
-  const primary = variant === 'primary';
-  const fg = primary ? theme.onAccent : theme.accent;
+  const fg = colors?.foreground ?? (variant === 'primary' ? theme.onAccent : theme.accent);
+  const bg =
+    colors?.background ??
+    { primary: theme.accent, secondary: theme.accentSoft, plain: 'transparent' }[variant];
 
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       {...rest}
       style={[
         {
-          minHeight: size === 'large' ? 54 : 44,
-          paddingHorizontal: size === 'large' ? Spacing.six : Spacing.five,
-          borderRadius: Radius.pill,
-          backgroundColor: primary ? theme.accent : theme.accentSoft,
+          minHeight: size === 'large' ? 52 : 40,
+          paddingHorizontal: size === 'large' ? Spacing.xl : Spacing.lg,
+          borderRadius: Radius.capsule,
+          backgroundColor: bg,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: Spacing.two,
-          opacity: disabled ? 0.5 : 1,
+          gap: Spacing.sm,
+          opacity: disabled ? 0.4 : 1,
         },
         style,
       ]}>
-      {icon && <Icon name={icon} size={size === 'large' ? 20 : 18} color={fg} weight="semibold" />}
-      <AppText variant="headline" style={{ color: fg }}>
+      {icon && <Icon name={icon} size={size === 'large' ? 17 : 15} color={fg} weight="semibold" />}
+      <AppText variant={size === 'large' ? 'headline' : 'subhead'} weight="600" color={fg}>
         {label}
       </AppText>
     </PressableScale>

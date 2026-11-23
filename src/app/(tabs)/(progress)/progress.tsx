@@ -3,219 +3,200 @@ import { View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
-import { Card } from '@/components/card';
+import { DayPips } from '@/components/day-pips';
+import { Group, Row } from '@/components/group';
 import { Icon } from '@/components/icon';
-import { ScreenScroll, SectionHeader } from '@/components/screen-scroll';
-import { Radius, Spacing } from '@/constants/theme';
-import { EXERCISES } from '@/data/exercises';
+import { ScreenScroll } from '@/components/screen-scroll';
+import { ScreenInset, Spacing } from '@/constants/theme';
+import { EXERCISES, MAX_STAGE } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
-import { currentStreak, format, formatShift, lastSevenDays, totals } from '@/lib/stats';
-import { useAppState, type SessionRecord } from '@/store/app-store';
+import {
+  currentStreak,
+  FELT_LABEL,
+  format,
+  formatDuration,
+  lastSevenDays,
+  relativeDay,
+  stageReadiness,
+  type Readiness,
+} from '@/lib/stats';
+import { useAppState, type Felt, type SessionRecord } from '@/store/app-store';
 
-const RECENT_LIMIT = 20;
+const HISTORY_LIMIT = 30;
 
 export default function ProgressScreen() {
   const sessions = useAppState((s) => s.sessions);
+  const stage = useAppState((s) => s.stage);
+  const stageSince = useAppState((s) => s.stageSince);
 
   if (sessions.length === 0) return <EmptyProgress />;
 
-  const { count, minutes, avgShift } = totals(sessions);
-  const streak = currentStreak(sessions);
   const week = lastSevenDays(sessions);
+  const weekCount = week.reduce((sum, d) => sum + d.count, 0);
+  const readiness = stageReadiness(sessions, stage, stageSince);
+  const totalSec = sessions.reduce((sum, s) => sum + s.durationSec, 0);
+  const streak = currentStreak(sessions);
 
   return (
     <ScreenScroll>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three }}>
-        <Stat label="Sessions" value={String(count)} />
-        <Stat label="Minutes" value={String(minutes)} />
-        <Stat label="Streak" value={String(streak)} unit={streak === 1 ? 'day' : 'days'} />
-        <Stat
-          label="Avg. calm change"
-          value={avgShift === null ? '–' : formatShift(avgShift)}
-          accent={avgShift !== null && avgShift > 0}
-        />
-      </View>
+      <Group title="This week" detail={`${weekCount} ${weekCount === 1 ? 'session' : 'sessions'}`}>
+        <WeekStrip days={week} />
+      </Group>
 
-      <WeekChart days={week} />
+      <Group title={EXERCISES[stage - 1].title}>
+        <StageProgress stage={stage} readiness={readiness} />
+      </Group>
 
-      <SectionHeader>
-        <AppText variant="caption" tone="tertiary">
-          Recent sessions
-        </AppText>
-      </SectionHeader>
-      <Card padded={false}>
-        {sessions.slice(0, RECENT_LIMIT).map((session, i) => (
-          <SessionRow key={session.id} session={session} divider={i > 0} />
+      <Group
+        title="History"
+        footer={`${sessions.length} ${sessions.length === 1 ? 'session' : 'sessions'} · ${formatDuration(totalSec)} in total${streak > 1 ? ` · ${streak}-day streak` : ''}`}>
+        {sessions.slice(0, HISTORY_LIMIT).map((s) => (
+          <HistoryRow key={s.id} session={s} />
         ))}
-      </Card>
+      </Group>
     </ScreenScroll>
   );
 }
 
-function Stat({
-  label,
-  value,
-  unit,
-  accent,
-}: {
-  label: string;
-  value: string;
-  unit?: string;
-  accent?: boolean;
-}) {
-  return (
-    <Card style={{ flexGrow: 1, flexBasis: '45%', gap: Spacing.one, padding: Spacing.five }}>
-      <AppText variant="footnote" tone="secondary">
-        {label}
-      </AppText>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-        <AppText variant="stat" tone={accent ? 'accent' : 'primary'} numeric selectable>
-          {value}
-        </AppText>
-        {unit ? (
-          <AppText variant="callout" tone="secondary">
-            {unit}
-          </AppText>
-        ) : null}
-      </View>
-    </Card>
-  );
-}
-
-function WeekChart({ days }: { days: ReturnType<typeof lastSevenDays> }) {
+function WeekStrip({ days }: { days: ReturnType<typeof lastSevenDays> }) {
   const theme = useTheme();
-  const max = Math.max(10, ...days.map((d) => d.minutes));
-  const BAR_AREA = 120;
-
-  return (
-    <Card style={{ gap: Spacing.four }}>
-      <View
-        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <AppText variant="headline">Last 7 days</AppText>
-        <AppText variant="footnote" tone="secondary" numeric>
-          {days.reduce((s, d) => s + d.minutes, 0)} min
-        </AppText>
-      </View>
-      <View
-        style={{ flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.two, height: BAR_AREA }}
-        accessible
-        accessibilityLabel={days
-          .map((d) => `${format.weekday(d.date)}: ${d.minutes} minutes`)
-          .join(', ')}>
-        {days.map((d) => (
-          <View
-            key={d.date.toISOString()}
-            style={{ flex: 1, alignItems: 'center', gap: Spacing.one }}>
-            {d.minutes > 0 ? (
-              <AppText variant="footnote" tone="secondary" numeric style={{ fontSize: 11 }}>
-                {d.minutes}
-              </AppText>
-            ) : null}
-            <View
-              style={{
-                width: '100%',
-                maxWidth: 28,
-                height: Math.max(4, (d.minutes / max) * (BAR_AREA - 24)),
-                borderRadius: 6,
-                borderCurve: 'continuous',
-                backgroundColor: d.minutes > 0 ? theme.accent : theme.surfaceMuted,
-                opacity: d.minutes > 0 && !d.isToday ? 0.55 : 1,
-              }}
-            />
-          </View>
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-        {days.map((d) => (
-          <AppText
-            key={d.date.toISOString()}
-            variant="footnote"
-            tone={d.isToday ? 'primary' : 'tertiary'}
-            center
-            style={{ flex: 1, fontSize: 11, fontWeight: d.isToday ? '600' : '400' }}>
-            {format.weekday(d.date)}
-          </AppText>
-        ))}
-      </View>
-    </Card>
-  );
-}
-
-function SessionRow({ session, divider }: { session: SessionRecord; divider: boolean }) {
-  const theme = useTheme();
-  const ended = new Date(session.endedAt);
-  const shift = session.after - session.before;
-  const exercise = EXERCISES[session.stage - 1];
-
   return (
     <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.four,
-        paddingVertical: Spacing.three,
-        paddingHorizontal: Spacing.five,
-        minHeight: 64,
-        borderTopWidth: divider ? 1 : 0,
-        borderTopColor: theme.separator,
-      }}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <AppText variant="headline">{format.date(ended)}</AppText>
-        <AppText variant="footnote" tone="secondary" numeric>
-          {format.time(ended)} · {Math.max(1, Math.round(session.durationSec / 60))} min · Stage{' '}
-          {session.stage}, {exercise?.title ?? ''}
-        </AppText>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 2 }}>
-        <AppText variant="headline" numeric selectable>
-          {session.before} → {session.after}
-        </AppText>
-        <AppText
-          variant="footnote"
-          numeric
-          tone={shift > 0 ? 'accent' : 'tertiary'}
-          style={{ fontWeight: '600' }}>
-          {shift === 0 ? 'No change' : `${formatShift(shift)} calm`}
-        </AppText>
-      </View>
+      style={{ flexDirection: 'row', paddingHorizontal: Spacing.sm, paddingVertical: ScreenInset }}
+      accessible
+      accessibilityLabel={days.map((d) => `${format.weekday(d.date)}: ${d.count}`).join(', ')}>
+      {days.map((d) => (
+        <View key={d.date.toISOString()} style={{ flex: 1, alignItems: 'center', gap: Spacing.sm }}>
+          <View style={{ height: 34, justifyContent: 'flex-end' }}>
+            <DayPips
+              count={d.count}
+              direction="column"
+              filled={theme.accent}
+              empty={theme.separator}
+              size={8}
+            />
+          </View>
+          <AppText
+            variant="footnote"
+            tone={d.isToday ? 'primary' : 'tertiary'}
+            weight={d.isToday ? '600' : '400'}>
+            {format.narrowDay(d.date)}
+          </AppText>
+        </View>
+      ))}
     </View>
   );
 }
 
-function EmptyProgress() {
+function FeltMark({ felt }: { felt: Felt | null }) {
   const theme = useTheme();
+  const size = 12;
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor:
+          felt === 'clearly'
+            ? theme.accent
+            : felt === 'somewhat'
+              ? theme.accentSoft
+              : 'transparent',
+        borderWidth: felt === 'clearly' ? 0 : 1.5,
+        borderColor: felt === 'somewhat' ? theme.accent : theme.separator,
+      }}
+    />
+  );
+}
+
+function StageProgress({ stage, readiness }: { stage: number; readiness: Readiness }) {
+  const exercise = EXERCISES[stage - 1];
+  const next = EXERCISES[stage];
+  const { recent, clearly } = readiness;
+
+  let summary: string;
+  if (recent.length === 0) {
+    summary = `After each session you’ll note how clearly the ${exercise.title.toLowerCase()} came. That tells you when to move on.`;
+  } else if (readiness.ready && next) {
+    summary = `It came clearly in ${clearly} of your last ${recent.length} sessions. You’re ready to add ${next.title.toLowerCase()}.`;
+  } else if (stage === MAX_STAGE && clearly >= 3) {
+    summary = 'You’ve learned all six exercises. Keep practicing the full sequence.';
+  } else {
+    summary = `It came clearly in ${clearly} of your last ${recent.length} ${recent.length === 1 ? 'session' : 'sessions'}. There’s no rush; it usually takes about a week.`;
+  }
+
+  return (
+    <View style={{ padding: ScreenInset, gap: Spacing.md }}>
+      <View
+        style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}
+        accessible
+        accessibilityLabel={`Last sessions: ${recent.map((f) => (f ? FELT_LABEL[f] : 'not noted')).join(', ') || 'none'}`}>
+        {Array.from({ length: 5 }, (_, i) => (
+          <FeltMark key={i} felt={recent[recent.length - 1 - i] ?? null} />
+        ))}
+        <AppText variant="footnote" tone="secondary" numeric style={{ marginLeft: Spacing.xs }}>
+          Day {readiness.daysAtStage} · {readiness.practiceDays} practice{' '}
+          {readiness.practiceDays === 1 ? 'day' : 'days'}
+        </AppText>
+      </View>
+      <AppText variant="subhead">{summary}</AppText>
+    </View>
+  );
+}
+
+function HistoryRow({ session }: { session: SessionRecord }) {
+  const theme = useTheme();
+  const ended = new Date(session.endedAt);
+  const exercise = EXERCISES[session.stage - 1];
+  const parts = [
+    exercise?.title ?? `Stage ${session.stage}`,
+    formatDuration(session.durationSec),
+    session.bedtime
+      ? 'Before sleep'
+      : session.felt
+        ? `Felt it: ${FELT_LABEL[session.felt].toLowerCase()}`
+        : null,
+  ].filter(Boolean);
+
+  return (
+    <Row
+      title={`${relativeDay(ended)}, ${format.time(ended)}`}
+      detail={parts.join(' · ')}
+      trailing={
+        session.after === null ? (
+          <Icon
+            name={{ ios: 'moon', android: 'bedtime', web: 'bedtime' }}
+            size={16}
+            color={theme.textTertiary}
+          />
+        ) : (
+          <AppText variant="subhead" tone="secondary" numeric>
+            {session.before} → {session.after}
+          </AppText>
+        )
+      }
+    />
+  );
+}
+
+function EmptyProgress() {
   const router = useRouter();
 
   return (
     <ScreenScroll contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-      <View style={{ alignItems: 'center', gap: Spacing.four, paddingVertical: Spacing.ten }}>
-        <View
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: Radius.card,
-            borderCurve: 'continuous',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: theme.accentSoft,
-          }}>
-          <Icon
-            name={{ ios: 'chart.bar', android: 'bar_chart', web: 'bar_chart' }}
-            size={32}
-            color={theme.accent}
-          />
-        </View>
+      <View style={{ alignItems: 'center', gap: Spacing.sm, paddingBottom: Spacing.section }}>
         <AppText variant="title" center>
           No sessions yet
         </AppText>
-        <AppText variant="callout" tone="secondary" center style={{ maxWidth: 300 }}>
-          Finish your first session and you’ll see your streak, minutes and how much calmer each one
-          leaves you.
+        <AppText variant="subhead" tone="secondary" center style={{ maxWidth: 300 }}>
+          Your week, your practice diary and how calm each session leaves you will show up here.
         </AppText>
         <Button
-          label="Begin session"
-          icon={{ ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' }}
-          style={{ marginTop: Spacing.two, alignSelf: 'stretch' }}
+          label="Start session"
+          size="medium"
+          variant="secondary"
+          style={{ marginTop: Spacing.md }}
           onPress={() => router.push('/session')}
         />
       </View>
