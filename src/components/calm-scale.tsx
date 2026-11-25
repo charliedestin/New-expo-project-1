@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { SessionPalette, Spacing } from '@/constants/theme';
-import { haptic } from '@/lib/haptics';
+import { fire } from '@/lib/feedback';
 
 const WORDS = ['Very tense', 'Tense', 'Uneasy', 'Okay', 'Relaxed', 'Calm', 'Very calm'];
 
@@ -46,7 +46,7 @@ export function CalmScale({ value, onChange }: Props) {
           onValueChange={(next) => {
             const rounded = Math.round(next);
             if (rounded !== value) {
-              haptic.selection();
+              fire('select');
               onChange(rounded);
             }
           }}

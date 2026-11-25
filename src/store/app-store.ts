@@ -128,6 +128,11 @@ export function useAppState<T>(selector: (s: AppState) => T): T {
   );
 }
 
+/** Current state outside React (the feedback layer reads the user's toggles here). */
+export function getState(): AppState {
+  return state;
+}
+
 export const actions = {
   setStage(stage: number) {
     const next = Math.min(Math.max(1, stage), MAX_STAGE);

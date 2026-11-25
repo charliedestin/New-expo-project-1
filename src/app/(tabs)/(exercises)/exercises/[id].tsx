@@ -9,7 +9,7 @@ import { ScreenScroll } from '@/components/screen-scroll';
 import { ScreenInset, Spacing } from '@/constants/theme';
 import { exerciseById } from '@/data/exercises';
 import { useTheme } from '@/hooks/use-theme';
-import { haptic } from '@/lib/haptics';
+import { fire } from '@/lib/feedback';
 import { actions, useAppState } from '@/store/app-store';
 
 export default function ExerciseDetailScreen() {
@@ -74,7 +74,7 @@ export default function ExerciseDetailScreen() {
             }
             variant={isLearned ? 'secondary' : 'primary'}
             onPress={() => {
-              haptic.success();
+              fire('stageAdded');
               actions.setStage(exercise.stage);
             }}
           />

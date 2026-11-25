@@ -8,7 +8,7 @@ Autogenic training is a relaxation method: you repeat short phrases silently ("M
 
 - **Practice**: today's phrase and session length, today's sessions against the 2–3 a day the method recommends, and the session as a list. When the current sensation has come clearly in most recent sessions over at least five days, it suggests adding the next exercise.
 - **Session** (full screen, always dim): a calm check-in, then the phrases. It's built for eyes-closed practice:
-  - a singing-bowl bell opens the session and marks each new phrase, and a lower bell ends it;
+  - a singing-bowl bell opens the session and marks each new phrase, and a lower bell tells you when to come back;
   - the voice reads each phrase once (or every repetition, or not at all);
   - the controls fade away after a few seconds, and a tap brings them back.
   - **Before sleep** leaves out the coming-back steps, ends silently, saves on its own and lets the phone sleep.
@@ -33,6 +33,7 @@ Scan the QR code with Expo Go. Everything used is included in Expo Go.
 - Neutrals are the platform's own (UIKit semantic colors on iOS), with one sage accent. No shadows; grouping comes from inset-grouped sections and hairlines.
 - Motion is limited to state changes with a purpose: press feedback (Reanimated CSS transitions), the phrase cross-fade and the controls fading. Tabs and screens use native transitions.
 - The bell sounds in `assets/sounds` are synthesized for this app (no third-party audio).
+- All haptics and sounds go through one semantic vocabulary in `src/lib/feedback.ts`, scaled by rarity. Bells play through the silent switch during a session and mix with your own music; the Bell toggle mutes the app. The full feedback audit is in `docs/feel-audit.md`.
 
 ## Structure
 

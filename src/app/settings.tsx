@@ -8,7 +8,7 @@ import { EXERCISES } from '@/data/exercises';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { confirm } from '@/lib/confirm';
-import { haptic } from '@/lib/haptics';
+import { fire } from '@/lib/feedback';
 import { actions, useAppState, type Pace, type VoiceMode } from '@/store/app-store';
 
 const supportsHaptics = process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android';
@@ -34,7 +34,7 @@ export default function SettingsScreen() {
       destructive: true,
     });
     if (ok) {
-      haptic.success();
+      fire('reset');
       actions.resetProgress();
     }
   };
@@ -79,14 +79,16 @@ export default function SettingsScreen() {
             />
             {supportsHaptics ? (
               <Switch
-                label="Gentle taps"
+                label="Haptics"
                 value={settings.haptics}
                 onValueChange={(on) => actions.updateSettings({ haptics: on })}
               />
             ) : null}
             <FieldGroup.SectionFooter>
               <Text textStyle={{ fontSize: 13, color: plain.textSecondary }}>
-                With your eyes closed, the bell marks each new phrase and the end of the session.
+                With your eyes closed, a bell marks each new phrase and a lower bell tells you when
+                to come back. Haptics tap at the same moments if you’re holding the phone. Bells
+                play even with the ringer off; turn Bell off to silence the app.
               </Text>
             </FieldGroup.SectionFooter>
           </FieldGroup.Section>

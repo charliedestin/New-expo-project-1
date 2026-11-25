@@ -5,7 +5,7 @@ import * as Speech from 'expo-speech';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, Pressable, ScrollView, View } from 'react-native';
-import Animated, { cubicBezier, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { cubicBezier, FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
@@ -15,7 +15,7 @@ import { Icon } from '@/components/icon';
 import { MaxContentWidth, Motion, Radius, SessionPalette as P, Spacing } from '@/constants/theme';
 import { EXERCISES } from '@/data/exercises';
 import { confirm } from '@/lib/confirm';
-import { haptic } from '@/lib/haptics';
+import { announce, fire, prepareFeedback } from '@/lib/feedback';
 import {
   buildSessionPlan,
   formatMinutes,
@@ -23,8 +23,7 @@ import {
   type SessionStep,
 } from '@/lib/session-plan';
 import { FELT_LABEL, stageReadiness } from '@/lib/stats';
-import { useBells } from '@/lib/use-bells';
-import { actions, useAppState, type Felt } from '@/store/app-store';
+import { actions, getState, useAppState, type Felt } from '@/store/app-store';
 
 type Phase = 'checkin' | 'practice' | 'checkout' | 'done' | 'asleep';
 
@@ -49,7 +48,6 @@ const SENSATION: Record<string, string> = {
 export default function SessionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const bells = useBells();
   const stage = useAppState((s) => s.stage);
   const stageSince = useAppState((s) => s.stageSince);
   const settings = useAppState((s) => s.settings);
@@ -67,6 +65,8 @@ export default function SessionScreen() {
   const [paused, setPaused] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [voiceId, setVoiceId] = useState<string>();
+  /** This session made the current exercise reliable: the app's rarest moment. */
+  const [milestone, setMilestone] = useState(false);
 
   const preview = useMemo(
     () => buildSessionPlan(stage, settings, { bedtime }),
@@ -89,6 +89,7 @@ export default function SessionScreen() {
 
   // The screen stays on for the session, and is released the moment it ends.
   useEffect(() => {
+    prepareFeedback();
     activateKeepAwakeAsync(KEEP_AWAKE).catch(() => {});
     return () => {
       deactivateKeepAwake(KEEP_AWAKE).catch(() => {});
@@ -127,7 +128,7 @@ export default function SessionScreen() {
         deactivateKeepAwake(KEEP_AWAKE).catch(() => {});
         setPhase('asleep');
       } else {
-        if (settings.bell) bells.close();
+        // The low bell already rang when coming back began; the eyes are open by now.
         setAfter(before);
         setPhase('checkout');
       }
@@ -150,13 +151,22 @@ export default function SessionScreen() {
     const isNewStep = lastStep.current !== position.stepIndex;
     lastStep.current = position.stepIndex;
 
+    // This effect is the single owner of practice feedback.
     let delay = 0;
-    if (isNewStep && settings.bell && step.kind !== 'return') {
-      if (position.stepIndex === 0) bells.open();
-      else bells.next();
-      delay = VOICE_AFTER_BELL_MS;
+    if (isNewStep) {
+      const previous = plan[position.stepIndex - 1];
+      const event =
+        position.stepIndex === 0
+          ? 'sessionStart'
+          : step.kind === 'return'
+            ? previous?.kind === 'return'
+              ? null // later coming-back lines flow on without a bell
+              : 'comeBack'
+            : 'phrase';
+      if (event && fire(event)) delay = VOICE_AFTER_BELL_MS;
+      // VoiceOver users hear the phrase from the screen reader when the app's voice is off.
+      if (settings.voice === 'off') announce(step.phrase);
     }
-    if (isNewStep && settings.haptics) haptic.soft();
 
     const speak =
       settings.voice === 'every' ||
@@ -179,7 +189,7 @@ export default function SessionScreen() {
   }, [phase, paused, controlsVisible, touchTick]);
 
   const begin = () => {
-    haptic.light();
+    // No haptic here: the first phrase's cue (sessionStart) is the one confirmation.
     elapsedRef.current = 0;
     lastStep.current = -1;
     setElapsedMs(0);
@@ -217,9 +227,18 @@ export default function SessionScreen() {
   };
 
   const saveCheckout = () => {
+    const wasReady = stageReadiness(sessions, stage, stageSince).ready;
     save({ after, felt });
-    haptic.success();
+    const now = getState();
+    const newlyReady =
+      !wasReady &&
+      now.snoozedStage !== stage &&
+      stageReadiness(now.sessions, stage, now.stageSince).ready;
+    setMilestone(newlyReady);
     setPhase('done');
+    // The milestone replaces the routine 'saved' cue rather than stacking on it.
+    if (newlyReady) setTimeout(() => fire('milestone'), 350);
+    else fire('saved');
   };
 
   // Android back: asks before ending a practice; saves from the check-out.
@@ -236,8 +255,6 @@ export default function SessionScreen() {
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, after, felt, paused]);
-
-  const readinessNow = stageReadiness(sessions, stage, stageSince);
 
   return (
     <View style={{ flex: 1, backgroundColor: P.background }}>
@@ -315,7 +332,7 @@ export default function SessionScreen() {
             setTouchTick((t) => t + 1);
           }}
           onTogglePause={() => {
-            haptic.light();
+            fire('pause');
             if (!paused) Speech.stop();
             setPaused((p) => !p);
             setTouchTick((t) => t + 1);
@@ -350,7 +367,7 @@ export default function SessionScreen() {
               <Choice<Felt>
                 value={felt}
                 onChange={(f) => {
-                  haptic.selection();
+                  fire('select');
                   setFelt(f);
                 }}
                 options={(['clearly', 'somewhat', 'not-yet'] as const).map((f) => ({
@@ -379,21 +396,25 @@ export default function SessionScreen() {
             <AppText variant="subhead" center numeric color={P.textSecondary}>
               Calm {before} → {after} · {formatMinutes(elapsedMs / 1000)}
             </AppText>
-            <AppText
-              variant="subhead"
-              center
-              color={P.textSecondary}
-              style={{ paddingHorizontal: Spacing.lg }}>
-              {felt === 'not-yet'
-                ? 'That’s normal in the first days. The sensations come with repetition, not effort.'
-                : readinessNow.ready && EXERCISES[stage]
-                  ? `You’re ready to add ${EXERCISES[stage].title.toLowerCase()}. You’ll find it on the Practice tab.`
-                  : null}
-            </AppText>
+            {milestone && EXERCISES[stage] ? (
+              <Milestone current={exercise.title} nextIndex={stage} />
+            ) : felt === 'not-yet' ? (
+              <AppText
+                variant="subhead"
+                center
+                color={P.textSecondary}
+                style={{ paddingHorizontal: Spacing.lg }}>
+                That’s normal in the first days. The sensations come with repetition, not effort.
+              </AppText>
+            ) : null}
           </Animated.View>
           <Button
             label="Done"
-            colors={{ background: P.accent, foreground: P.onAccent }}
+            colors={
+              milestone
+                ? { background: P.fill as string, foreground: P.text }
+                : { background: P.accent, foreground: P.onAccent }
+            }
             onPress={close}
           />
         </Screen>
@@ -757,5 +778,70 @@ function Asleep({ insets, onDone }: { insets: Insets; onDone: () => void }) {
         </View>
       ) : null}
     </Pressable>
+  );
+}
+
+/**
+ * The rarest moment in the app: the current sensation has come reliably, so the next exercise
+ * can be added. It's the only place with an entrance beyond a fade (rises from 0.95), the only
+ * two-note bell and the longest haptic. Reduce Motion keeps the fade and drops the scale.
+ */
+function Milestone({ current, nextIndex }: { current: string; nextIndex: number }) {
+  const reduceMotion = useReducedMotion();
+  const [added, setAdded] = useState(false);
+  // Frozen on first render: adding the exercise changes the stage, which must not change this card.
+  const [{ next, previous }] = useState(() => ({ next: EXERCISES[nextIndex], previous: current }));
+
+  return (
+    <Animated.View
+      style={{
+        marginTop: Spacing.xl,
+        alignItems: 'center',
+        gap: Spacing.md,
+        padding: Spacing.xl,
+        borderRadius: Radius.group,
+        borderCurve: 'continuous',
+        backgroundColor: P.fill,
+        animationName: {
+          from: { opacity: 0, transform: [{ scale: reduceMotion ? 1 : 0.95 }] },
+          to: { opacity: 1, transform: [{ scale: 1 }] },
+        },
+        animationDuration: 480,
+        animationDelay: 300,
+        animationTimingFunction: EASE_OUT,
+        animationFillMode: 'backwards',
+      }}>
+      <View
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: P.accentSoft,
+        }}>
+        <Icon name={next.icon} size={26} color={P.accent} />
+      </View>
+      <AppText variant="headline" center color={P.text}>
+        {added ? `${next.title} is in your next session` : `Ready for ${next.title.toLowerCase()}`}
+      </AppText>
+      <AppText variant="subhead" center color={P.textSecondary}>
+        {added
+          ? `It comes after ${previous.toLowerCase()}. Give it about a week.`
+          : `${previous} has come clearly in most of your recent sessions.`}
+      </AppText>
+      {!added ? (
+        <Button
+          label={`Add ${next.title.toLowerCase()}`}
+          size="medium"
+          colors={{ background: P.accent, foreground: P.onAccent }}
+          onPress={() => {
+            fire('stageAdded');
+            actions.setStage(next.stage);
+            setAdded(true);
+          }}
+        />
+      ) : null}
+    </Animated.View>
   );
 }
